@@ -27,6 +27,10 @@ RUN npm install --no-optional
 # 5. Baaki code copy karein
 COPY . .
 
+# DEBUGGING STEP:
+# Ye command files ki list print karegi taaki hum dekh sakein server.js wahan hai ya nahi
+RUN ls -la
+
 # 6. Port expose karein
 EXPOSE 3000
 
