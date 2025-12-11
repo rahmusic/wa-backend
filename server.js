@@ -41,9 +41,15 @@ const client = new Client({
 
 // --- QR Code Logic ---
 client.on('qr', (qr) => {
-    console.log('QR RECEIVED', qr);
+    // console.log('QR RECEIVED', qr); // Ye line hata di hai taaki lamba text na aaye
+    console.log('Generating QR Code...');
+    
+    // 'small: true' option QR ko chota aur scannable banata hai
     qrcode.generate(qr, { small: true });
+    
+    console.log('--------------------------------------------------');
     console.log('SCAN THIS QR CODE IN YOUR WHATSAPP LINKED DEVICES');
+    console.log('--------------------------------------------------');
 });
 
 client.on('ready', () => {
