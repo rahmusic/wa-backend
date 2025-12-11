@@ -1,54 +1,48 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const express = require('express');
 const cors = require('cors');
 
+// Note: qrcode-terminal hata diya hai kyunki wo Render par toot raha tha
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
 
-// --- WhatsApp Client Setup (CRASH FIXES ADDED) ---
+// --- WhatsApp Client Setup ---
 const client = new Client({
-    // Restart hone par session save rakhe
     authStrategy: new LocalAuth({ 
         dataPath: './auth_info' 
     }),
-    
-    // Puppeteer launch settings (Memory optimize karne ke liye)
     puppeteer: {
         headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage', // Memory crash fix
+            '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu' 
-            // Note: '--single-process' hata diya gaya hai kyunki wo crash kar raha tha
         ],
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
-        // Timeout badha diya taaki dheere load hone par crash na ho
         timeout: 60000 
     },
-    // Web version cache karne se stability badhti hai
     webVersionCache: {
         type: 'remote',
         remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
     }
 });
 
-// --- QR Code Logic ---
+// --- QR Code Logic (CHANGED TO LINK) ---
 client.on('qr', (qr) => {
-    // console.log('QR RECEIVED', qr); // Ye line hata di hai taaki lamba text na aaye
-    console.log('Generating QR Code...');
-    
-    // 'small: true' option QR ko chota aur scannable banata hai
-    qrcode.generate(qr, { small: true });
-    
     console.log('--------------------------------------------------');
-    console.log('SCAN THIS QR CODE IN YOUR WHATSAPP LINKED DEVICES');
+    console.log('QR Code Generated!');
+    console.log('Render Console par QR toot raha tha, isliye niche diye gaye LINK par click karein:');
+    
+    // QR string ko ek Image URL mein convert kar rahe hain
+    const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+    
+    console.log('\n👉 CLICK HERE TO SCAN: ' + qrLink + '\n');
     console.log('--------------------------------------------------');
 });
 
@@ -56,7 +50,6 @@ client.on('ready', () => {
     console.log('Client is ready!');
 });
 
-// Agar client disconnect ho jaye toh restart karo
 client.on('disconnected', (reason) => {
     console.log('Client was disconnected', reason);
     client.initialize();
@@ -74,10 +67,9 @@ app.get('/get-dp', async (req, res) => {
 
     try {
         if (client.info === undefined) {
-             return res.status(503).json({ success: false, message: 'Server starting... check logs for QR' });
+             return res.status(503).json({ success: false, message: 'Server starting... check logs for QR Link' });
         }
         
-        // Timeout add kiya taaki agar request atak jaye toh server na gire
         const photoUrl = await Promise.race([
             client.getProfilePicUrl(chatId),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
@@ -95,7 +87,7 @@ app.get('/get-dp', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.send('WhatsApp Backend is Running with Crash Fixes!');
+    res.send('WhatsApp Backend is Running!');
 });
 
 app.listen(port, () => {
