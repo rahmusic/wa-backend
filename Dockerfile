@@ -1,7 +1,7 @@
-FROM node:18-slim
+FROM node:18
 
-# Install Google Chrome Stable and fonts
-# Note: this installs the necessary libs to make the bundled version of Chromium that Puppeteer installs, work.
+# 1. Google Chrome aur zaroori fonts install karein
+# Hum 'node:18' (Full version) use kar rahe hain jo stable hai
 RUN apt-get update \
     && apt-get install -y wget gnupg \
     && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
@@ -11,16 +11,23 @@ RUN apt-get update \
       --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
+# 2. Folder set karein
 WORKDIR /usr/src/app
 
+# 3. Dependencies copy karein
 COPY package*.json ./
-# Skip downloading Chromium since we installed Google Chrome
+
+# Puppeteer ko batayein ki Chromium download na kare (humne Chrome daal diya hai)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-RUN npm install
+# 4. Install karein (Is baar --no-optional lagaya hai taaki crash na ho)
+RUN npm install --no-optional
 
+# 5. Baaki code copy karein
 COPY . .
 
+# 6. Port expose karein
 EXPOSE 3000
 
+# 7. Server start command
 CMD [ "node", "server.js" ]
