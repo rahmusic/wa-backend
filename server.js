@@ -24,10 +24,8 @@ const client = new Client({
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
         timeout: 60000 
     },
-    webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-    }
+    // WebVersionCache hata diya hai taaki latest compatible version load ho
+    // Agar future mein crash ho toh specific version wapas lagana pad sakta hai
 });
 
 // --- QR Code Logic ---
@@ -50,7 +48,7 @@ client.on('disconnected', (reason) => {
 
 client.initialize();
 
-// --- API Route (UPDATED FOR ABOUT & PRESENCE) ---
+// --- API Route (ROBUST ERROR HANDLING ADDED) ---
 app.get('/get-dp', async (req, res) => {
     const number = req.query.number;
     if (!number) return res.status(400).json({ error: 'Number is required' });
@@ -65,32 +63,41 @@ app.get('/get-dp', async (req, res) => {
         
         console.log(`Fetching data for ${sanitized_number}...`);
 
-        // 1. Get Contact Object
-        const contact = await client.getContactById(chatId);
-        
-        // 2. Parallel Fetch: DP, About, Presence
-        const [photoUrl, about, presence] = await Promise.all([
-            client.getProfilePicUrl(chatId).catch(() => null),
-            contact.getAbout().catch(() => null),
-            client.getPresence(chatId).catch(() => null) // Returns { id, status: 'offline'|'available', lastSeen... }
-        ]);
-
-        // 3. Process Presence Data
+        let photoUrl = null;
+        let about = null;
         let isOnline = false;
         let lastSeen = null;
 
-        if (presence) {
-            // 'available' means Online in WhatsApp Web
-            if (presence.status === 'available') {
-                isOnline = true;
-            }
-            // Note: Last seen timestamp might not always be available depending on privacy
-            if (presence.lastKnownPresence) {
-                lastSeen = presence.lastKnownPresence; // Unix timestamp
-            }
+        // 1. Try fetching DP (Safe Mode)
+        try {
+            photoUrl = await client.getProfilePicUrl(chatId);
+        } catch (e) {
+            console.log("Error fetching DP:", e.message);
         }
 
-        // 4. Send Response
+        // 2. Try fetching Contact/About (Ye part crash kar raha tha, ab safe hai)
+        try {
+            const contact = await client.getContactById(chatId);
+            if(contact) {
+                about = await contact.getAbout();
+            }
+        } catch (e) {
+            console.log("Error fetching About info (Skipping):", e.message);
+            // About fail ho toh default text dikhane ke liye null rehne do
+        }
+
+        // 3. Try fetching Presence (Online/Offline)
+        try {
+            const presence = await client.getPresence(chatId);
+            if (presence) {
+                if (presence.status === 'available') isOnline = true;
+                if (presence.lastKnownPresence) lastSeen = presence.lastKnownPresence;
+            }
+        } catch (e) {
+            console.log("Error fetching Presence (Skipping):", e.message);
+        }
+
+        // 4. Send whatever we found
         if (photoUrl || about || isOnline) {
             res.json({ 
                 success: true, 
@@ -100,11 +107,12 @@ app.get('/get-dp', async (req, res) => {
                 lastSeen: lastSeen
             });
         } else {
+            // Agar sab kuch fail ho jaye
             res.json({ success: false, message: 'No Data found or Privacy Restricted' });
         }
 
     } catch (error) {
-        console.error("Error fetching data:", error.message);
+        console.error("Critical Error:", error.message);
         res.status(500).json({ success: false, error: 'Failed to fetch Data' });
     }
 });
